@@ -1,0 +1,18 @@
+# z88dk z80asm — sanitizer-instrumented file-input CLI (SPEC §6.2 item 11).
+# @@ is the input arg (wla-dx pattern). MFUZZ_COMPAT_LEVEL required for Mayhem file-input smoketest.
+# NO `filepath:` on purpose: Mayhem stages a bare `@@` input in the run's WRITABLE cwd, and `-b`
+# writes the scratch .o/.bin next to that input — proven green (run 333: 72013 edges). An absolute
+# `filepath:` under the read-only image dir would break that; do not add one.
+project: savantenvs/z88dk
+target: z80asm
+
+cmds:
+  - cmd: /mayhem/z80asm -b @@
+    env:
+      MFUZZ_COMPAT_LEVEL: "2"
+
+# Canonical two-entry seed directive (SPEC §6.2 item 14): the server-accumulated tar plus the
+# per-target committed seeds at mayhem/<target>/testsuite.
+testsuite:
+  - https://$MAYHEM_DOMAIN/$MAYHEM_PROJECT/$MAYHEM_TARGET/testsuite.tar
+  - file://mayhem/z80asm/testsuite
