@@ -1,0 +1,33 @@
+# z88dk z80asm — sanitizer-instrumented file-input CLI (SPEC §6.2 item 11).
+#
+# Input delivery is the known-green RAW shape: a bare `@@`, no `filepath:`, no `cwd:`, no env.
+# Mayhem stages the input in the run's own writable cwd and `-b` drops its scratch .o/.bin next to
+# it, so the target needs no writable path of its own. Deliberately NOT redirected to a shared
+# scratch dir with `-O`: `-b` writes the object file and then reads it back to link, so a fixed
+# output directory would let concurrent fuzz workers clobber each other's intermediate .o.
+#
+# What failed run #4 ("the target times out on every test case ... and on the default test case")
+# was NOT this file — it was LeakSanitizer dying under Mayhem's tracer on every exec; see
+# mayhem/lsan_off.cc. The two knobs below are the smaller, related cleanups:
+#
+#   no MFUZZ_COMPAT_LEVEL — it was pinned at port time on the belief that a raw file-input target
+#     needs it, but nothing ever asked for it here (no auto-resolution event in any of runs #1-#4,
+#     and every phase reported smoketesting_succeeded). It holds mayhem-fuzz on its slowest
+#     compatibility path, and all four runs sat at ~2.5 tests/s against 32-64 tests/s for the green
+#     raw peers that set no env at all (dasm, chaos, microscheme, genometools). Re-introduce it only
+#     if mayhem-fuzz actually reports a restart loop / return code 254.
+#
+#   timeout: 30 — bounds ONE exec. Pinned because run #4's own remediation text said "Increase the
+#     cmd.timeout field in the Mayhemfile if needed". Insurance, not the fix.
+# origin: https://app.mayhem.security/mayhemheroes/z88dk/z80asm/333
+project: savantenvs/z88dk
+target: z80asm-buggy-mhh-run-333
+
+cmds:
+  - cmd: /mayhem/z80asm -b @@
+    timeout: 30
+
+# Server-accumulated tar only — no per-target local seeds on a backport branch (BACKPORT.md R9);
+# the workflow feeds this replay the origin run's crashers via --testsuite file://… --regression.
+testsuite:
+  - https://$MAYHEM_DOMAIN/$MAYHEM_PROJECT/$MAYHEM_TARGET/testsuite.tar
